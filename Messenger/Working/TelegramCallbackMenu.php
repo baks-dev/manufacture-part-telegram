@@ -23,15 +23,16 @@
 
 declare(strict_types=1);
 
-namespace BaksDev\Manufacture\Part\Telegram\Messenger\ManufacturePartWorking;
+namespace BaksDev\Manufacture\Part\Telegram\Messenger\Working;
 
-use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
+
+use BaksDev\Manufacture\Part\Telegram\Type\ManufacturePartWorking;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('baks.telegram.callback')]
 final class TelegramCallbackMenu
 {
-    private const CALLBACK = ManufacturePartUid::class;
+    private const CALLBACK = ManufacturePartWorking::class;
 
     public function getClass(): string
     {
