@@ -1,0 +1,29 @@
+admin:
+  page:
+    index: 'Product production'
+    new: 'Add production batch'
+    edit: 'Edit production batch'
+    delete: 'Delete production batch'
+    restore: 'Restore production batch'
+
+  breadcrumb:
+    index: 'Product requests'
+    new: 'Add production request'
+    edit: 'Edit production request'
+    delete: 'Delete production request'
+    restore: 'Restore production order'
+
+  success:
+    new: 'Application for the production of products has been successfully added'
+    edit: 'Manufacture request updated successfully'
+    delete: 'Product order successfully deleted'
+    restore: 'Product order successfully restored'
+
+  danger:
+    new: '%s: Error adding production request'
+    edit: '%s: Error updating production request'
+    delete: '%s: Error while deleting production request'
+    restore: '%s: Error restoring production order'
+  form:
+    label:
+      delete: 'Вы уверены, что желаете удалить заявку на производство продукции'

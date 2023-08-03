@@ -1,0 +1,125 @@
+<?php
+/*
+ *  Copyright 2023.  Baks.dev <admin@baks.dev>
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is furnished
+ *  to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NON INFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ *  THE SOFTWARE.
+ */
+
+declare(strict_types=1);
+
+namespace BaksDev\Manufacture\Part\Messenger\TelegramManufacturePartComplete;
+
+use BaksDev\Manufacture\Part\Entity\Event\ManufacturePartEvent;
+use BaksDev\Manufacture\Part\Entity\ManufacturePart;
+use BaksDev\Manufacture\Part\Repository\ActiveManufacturePartByProduct\ActiveManufacturePartByProductInterface;
+use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
+use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
+use BaksDev\Manufacture\Part\Type\Telegram\ManufacturePartDefect;
+use BaksDev\Manufacture\Part\Type\Telegram\ManufacturePartDone;
+use BaksDev\Manufacture\Part\UseCase\Admin\Complete\CompleteWorkingManufacturePartDTO;
+use BaksDev\Manufacture\Part\UseCase\Admin\Working\WorkingManufacturePartHandler;
+use BaksDev\Products\Category\Type\Id\ProductCategoryUid;
+use BaksDev\Telegram\Bot\Messenger\Callback\TelegramCallbackMessage;
+use Doctrine\ORM\EntityManagerInterface;
+use DomainException;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+#[AsMessageHandler(priority: 0)]
+final class TelegramManufacturePartComplete
+{
+    private EntityManagerInterface $entityManager;
+    private AllWorkingByManufacturePartInterface $allWorkingByManufacturePart;
+    private WorkingManufacturePartHandler $workingManufacturePartHandler;
+    private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart;
+    private ActiveManufacturePartByProductInterface $activeManufacturePartByProduct;
+
+    public function __construct(
+        EntityManagerInterface $entityManager,
+        ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
+        AllWorkingByManufacturePartInterface $allWorkingByManufacturePart,
+        WorkingManufacturePartHandler $workingManufacturePartHandler,
+        ActiveManufacturePartByProductInterface $activeManufacturePartByProduct,
+    )
+    {
+
+        $this->entityManager = $entityManager;
+        $this->activeWorkingManufacturePart = $activeWorkingManufacturePart;
+        $this->allWorkingByManufacturePart = $allWorkingByManufacturePart;
+        $this->workingManufacturePartHandler = $workingManufacturePartHandler;
+        $this->activeManufacturePartByProduct = $activeManufacturePartByProduct;
+
+    }
+
+    /**
+     * Закрывает заявку если все действия выполнены
+     */
+    public function __invoke(TelegramCallbackMessage $message): void
+    {
+        if($message->getClass() instanceof ManufacturePartDone || $message->getClass() instanceof ManufacturePartDefect)
+        {
+
+            /**
+             * Получаем заявку на производство (незавершенную, самую старую) по идентификатору продукта
+             */
+            $ManufacturePart = $this->activeManufacturePartByProduct->findManufacturePartByProduct($message->getClass());
+
+            if(!$ManufacturePart)
+            {
+                return;
+            }
+
+            /**
+             * Получаем информацию о партии производства со всеми выполненными действиями
+             */
+
+            $ManufacturePartProduct = $this->allWorkingByManufacturePart
+                ->fetchAllWorkingByManufacturePartAssociative($ManufacturePart->getId());
+            $CurrentManufacturePart = current($ManufacturePartProduct);
+
+            /** Если имеется хотя бы одно действие */
+            if($CurrentManufacturePart)
+            {
+                /** Получаем активное рабочее состояние */
+                $UsersTableActionsWorkingUid = $this->activeWorkingManufacturePart
+                    ->findNextWorkingByManufacturePart(
+                        $ManufacturePart->getId(),
+                        new ProductCategoryUid($CurrentManufacturePart['product_category_id'])
+                    );
+            }
+
+            if(!$CurrentManufacturePart || !$UsersTableActionsWorkingUid)
+            {
+                $this->entityManager->clear();
+
+                /** Получаем активное событие заявки на производство для закрытия */
+                $CompleteManufacturePartEvent = $this->entityManager->getRepository(ManufacturePartEvent::class)
+                    ->find($ManufacturePart->getEvent());
+
+                $CompleteWorkingManufacturePartDTO = new CompleteWorkingManufacturePartDTO();
+                $CompleteManufacturePartEvent->getDto($CompleteWorkingManufacturePartDTO);
+                $CompleteManufacturePartHandler = $this->workingManufacturePartHandler->handle($CompleteWorkingManufacturePartDTO);
+
+                if(!$CompleteManufacturePartHandler instanceof ManufacturePart)
+                {
+                    throw new DomainException(sprintf('Ошибка %s при закрытии заявки на производства', $CompleteManufacturePartHandler));
+                }
+            }
+        }
+    }
+}

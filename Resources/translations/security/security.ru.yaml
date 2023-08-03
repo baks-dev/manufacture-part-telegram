@@ -1,0 +1,17 @@
+# Роль
+
+ROLE_MANUFACTURE_PART_TELEGRAM:
+  name: 'Производство Telegram'
+  desc: 'Производство продукции с помощью Telegram-бота'
+
+# Правила
+
+ROLE_MANUFACTURE_PART_TELEGRAM_NEW:
+  name: 'Добавить'
+
+ROLE_MANUFACTURE_PART_TELEGRAM_EDIT:
+  name: 'Редактировать'
+
+ROLE_MANUFACTURE_PART_TELEGRAM_DELETE:
+  name: 'Удалить'
+

@@ -1,0 +1,41 @@
+{
+  "name": "baks-dev/manufacture-part-telegram",
+  "description": "Модуль производства партий продукции с помощью Telegram-бота",
+  "homepage": "https://github.com/baks-dev/manufacture-part-telegram",
+  "keywords": [
+    "symfony",
+    "bundle",
+    "library",
+    "module",
+    "plugin",
+    "manufacture",
+    "telegram",
+    "baksdev"
+  ],
+  "license": "MIT",
+  "type": "symfony-bundle",
+  "authors": [
+    {
+      "name": "Baks Development",
+      "email": "admin@baks.dev"
+    }
+  ],
+  "require": {
+    "php": ">=8.1"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "symfony/test-pack": "^1.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "BaksDev\\Manufacture\\Part\\Telegram\\": ""
+    }
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "symfony/flex": true
+    }
+  }
+}

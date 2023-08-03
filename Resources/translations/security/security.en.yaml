@@ -1,0 +1,16 @@
+# Role
+
+ROLE_MANUFACTURE_PART_TELEGRAM:
+  name: 'Production Telegram'
+  desc: 'Manufacture products using Telegram bot'
+
+# Rules
+
+ROLE_MANUFACTURE_PART_TELEGRAM_NEW:
+  name: 'Add'
+
+ROLE_MANUFACTURE_PART_TELEGRAM_EDIT:
+  name: 'Edit'
+
+ROLE_MANUFACTURE_PART_TELEGRAM_DELETE:
+  name: 'Delete'
