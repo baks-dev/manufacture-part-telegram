@@ -29,15 +29,20 @@ use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfil
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
+use BaksDev\Manufacture\Part\Repository\ProductsByManufacturePart\ProductsByManufacturePartInterface;
 use BaksDev\Manufacture\Part\Telegram\Type\ManufacturePartDone;
 use BaksDev\Manufacture\Part\Telegram\Type\ManufacturePartWorking;
+use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Telegram\Api\TelegramSendMessage;
 use BaksDev\Telegram\Bot\Messenger\Callback\TelegramCallbackMessage;
 use BaksDev\Telegram\Bot\Repository\UsersTableTelegramSettings\GetTelegramBotSettingsInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Cache\Adapter\ApcuAdapter;
+use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 #[AsMessageHandler(fromTransport: 'sync')]
 final class TelegramManufacturePartWorking
@@ -50,16 +55,23 @@ final class TelegramManufacturePartWorking
     private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart;
 
     private LoggerInterface $logger;
+    private UrlGeneratorInterface $urlGenerator;
+    private ProductsByManufacturePartInterface $productsByManufacturePart;
+    private iterable $reference;
+    private TranslatorInterface $translator;
 
     public function __construct(
+        #[TaggedIterator('baks.reference.choice')] iterable $reference,
         EntityManagerInterface $entityManager,
         ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
         ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
         TelegramSendMessage $telegramSendMessage,
         GetTelegramBotSettingsInterface $settings,
         AllWorkingByManufacturePartInterface $allWorkingByManufacturePart,
-
         LoggerInterface $logger,
+        UrlGeneratorInterface $urlGenerator,
+        ProductsByManufacturePartInterface $productsByManufacturePart,
+        TranslatorInterface $translator
     )
     {
         $this->telegramSendMessage = $telegramSendMessage;
@@ -70,6 +82,10 @@ final class TelegramManufacturePartWorking
         $this->allWorkingByManufacturePart = $allWorkingByManufacturePart;
 
         $this->logger = $logger;
+        $this->urlGenerator = $urlGenerator;
+        $this->productsByManufacturePart = $productsByManufacturePart;
+        $this->reference = $reference;
+        $this->translator = $translator;
     }
 
     /**
@@ -87,7 +103,8 @@ final class TelegramManufacturePartWorking
         /**
          * Получаем заявку на производство
          */
-        $ManufacturePart = $this->entityManager->getRepository(ManufacturePart::class)
+        $ManufacturePart = $this->entityManager
+            ->getRepository(ManufacturePart::class)
             ->find($message->getClass());
 
         if($ManufacturePart)
@@ -122,13 +139,48 @@ final class TelegramManufacturePartWorking
 
             if(!$UsersTableActionsWorkingUid)
             {
-                /** Отправляем сообщение о выполненной заявке  */
-                $this->telegramSendMessage
-                    ->message('Заявка выполнена')
-                    ->send();
-
                 /** Сбрасываем идентификатор */
                 $ApcuAdapter->delete('identifier-'.$message->getChat());
+
+                /** Получаем информацию о выполненных этапах */
+                $CompleteWorking = $this->activeWorkingManufacturePart
+                    ->fetchCompleteWorkingByManufacturePartAssociative($ManufacturePart->getId());
+
+                $caption = "Заявка выполнена";
+                $caption .= "\n";
+                $caption .= "\n";
+
+                if($CompleteWorking)
+                {
+
+                    $currentComplete = current($CompleteWorking);
+
+                    $caption .= 'Номер: <b>'.$currentComplete['part_number'].'</b>';
+                    $caption .= "\n";
+                    $caption .= 'Всего продукции: <b>'.$currentComplete['part_quantity'].' шт.</b>';
+                    $caption .= "\n";
+                    $caption .= "\n";
+
+
+                    /** Получаем продукцию в производственной партии и присваиваем к сообщению */
+                    $caption = $this->captionProducts($ManufacturePart->getId(), $caption);
+
+                    $caption .= '<b>Этапы производства:</b>';
+                    $caption .= "\n";
+                    foreach($CompleteWorking as $complete)
+                    {
+                        $caption .= $complete['working_name'].': <b>'.$complete['users_profile_username'].'</b>';
+                        $caption .= "\n";
+                    }
+                }
+
+
+                /** Отправляем сообщение о выполненной заявке  */
+                $this->telegramSendMessage
+                    ->message($caption)
+                    ->send();
+
+
                 return;
             }
 
@@ -136,7 +188,21 @@ final class TelegramManufacturePartWorking
             $ManufacturePartWorking = $this->allWorkingByManufacturePart
                 ->fetchAllWorkingByManufacturePartAssociative($ManufacturePart->getId());
 
-            $caption = "<b>Производство:</b> #".$ManufacturePart->getNumber()."\n \n";
+
+            $caption = '<b>Произвосдтвенная партия:</b>';
+            $caption .= "\n";
+            $caption .= "\n";
+
+
+            $caption .= 'Номер: <b>'.$ManufacturePart->getNumber().'</b>';
+            $caption .= "\n";
+            $caption .= 'Всего продукции: <b>'.$ManufacturePart->getQuantity().' шт.</b>';
+            $caption .= "\n";
+            $caption .= "\n";
+
+
+            /** Получаем продукцию в производственной партии и присваиваем к сообщению */
+            $caption = $this->captionProducts($ManufacturePart->getId(), $caption);
 
 
             /** Символ выполненного процесса  */
@@ -158,6 +224,9 @@ final class TelegramManufacturePartWorking
             $currentWorkingName = null;
 
 
+            $caption .= '<b>Этапы производства:</b>';
+            $caption .= "\n";
+
             /**
              * Все действия сотрудников, которые он может выполнить
              */
@@ -176,7 +245,7 @@ final class TelegramManufacturePartWorking
 
                 if($UsersTableActionsWorkingUid->equals($working['working_id']))
                 {
-                    $caption .= '<b> '.$ManufacturePart->getQuantity().' шт </b>';
+                    $caption .= ' <b>'.$ManufacturePart->getQuantity().' шт </b>';
                 }
 
                 $caption .= "\n";
@@ -188,10 +257,14 @@ final class TelegramManufacturePartWorking
             /* Комментарий к заявке */
             if($CurrentManufacturePart['part_comment'])
             {
-                $caption .= "\n".$CurrentManufacturePart['part_comment']."\n";
+                $caption .= "\n";
+                $caption .= $CurrentManufacturePart['part_comment'];
+                $caption .= "\n";
+
             }
 
-            $caption .= "\nЕсли Вами был найден брак - обратитесь к ответственному за данную производственную партию.";
+            $caption .= "\n";
+            $caption .= 'Если Вами был найден брак - обратитесь к ответственному за данную производственную партию.';
 
 
             $menu[] = [
@@ -217,8 +290,12 @@ final class TelegramManufacturePartWorking
 
 
         /** Отправляем сообщение о выполненной заявке  */
+        $caption = '<b>Производство:</b>';
+        $caption .= "\n";
+        $caption = 'Вышлите QR продукта, либо его идентификатор';
+
         $response = $this->telegramSendMessage
-            ->message("<b>Производство:</b>\nВышлите QR продукта, либо его идентификатор")
+            ->message($caption)
             ->send(false);
 
         /** Сохраняем последнее сообщение */
@@ -230,6 +307,80 @@ final class TelegramManufacturePartWorking
         /** Сбрасываем идентификатор */
 
         $ApcuAdapter->delete('identifier-'.$message->getChat());
-        
+
     }
+
+
+    public function captionProducts(ManufacturePartUid $part, string $caption): string
+    {
+        $caption .= '<b>Продукция:</b>';
+        $caption .= "\n";
+        $products = $this->productsByManufacturePart->getAllProductsByManufacturePart($part);
+
+        foreach($products as $key => $product)
+        {
+            $caption .= ($key + 1).'. '.$product['product_article'].' ';
+
+            $caption .= '<b>'.$product['product_total'].' шт. | </b>';
+
+            $caption .= $product['product_name'].' ';
+
+
+            if($product['product_offer_reference'])
+            {
+                foreach($this->reference as $reference)
+                {
+                    if($reference->type() === $product['product_offer_reference'])
+                    {
+                        $caption .= $this->translator->trans($product['product_offer_value'], domain: $reference->domain()).' ';
+                    }
+                }
+            }
+            else
+            {
+                $product['product_offer_value'] ? $caption .= $product['product_offer_value'].' ' : '';
+            }
+
+
+            if($product['product_variation_reference'])
+            {
+                foreach($this->reference as $reference)
+                {
+                    if($reference->type() === $product['product_variation_reference'])
+                    {
+                        $caption .= $this->translator->trans($product['product_variation_value'], domain: $reference->domain()).' ';
+                    }
+                }
+            }
+            else
+            {
+                $product['product_variation_value'] ? $caption .= $product['product_variation_value'].' ' : '';
+            }
+
+
+
+            if($product['product_modification_reference'])
+            {
+                foreach($this->reference as $reference)
+                {
+                    if($reference->type() === $product['product_modification_reference'])
+                    {
+                        $caption .= $this->translator->trans($product['product_variation_value'], domain: $reference->domain()).' ';
+                    }
+                }
+            }
+            else
+            {
+                $product['product_modification_value'] ? $caption .= $product['product_modification_value'].' ' : '';
+            }
+
+
+        }
+
+        $caption .= "\n";
+        $caption .= "\n";
+
+        return $caption;
+    }
+
 }

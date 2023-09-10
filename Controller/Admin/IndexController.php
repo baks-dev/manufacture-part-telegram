@@ -38,6 +38,6 @@ final class IndexController extends AbstractController
     #[Route('/admin/manufacture/parts/{page<\d+>}', name: 'admin.index', methods: ['GET', 'POST'])]
     public function index(): Response
     {
-        return new Response();
+        return new Response('/admin/manufacture/parts');
     }
 }

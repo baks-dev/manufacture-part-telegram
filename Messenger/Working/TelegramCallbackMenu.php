@@ -25,7 +25,6 @@ declare(strict_types=1);
 
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\Working;
 
-
 use BaksDev\Manufacture\Part\Telegram\Type\ManufacturePartWorking;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
