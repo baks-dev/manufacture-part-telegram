@@ -25,6 +25,7 @@ declare(strict_types=1);
 
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\Working;
 
+use BaksDev\Manufacture\Part\Telegram\Security\VoterTelegram;
 use BaksDev\Manufacture\Part\Telegram\Type\ManufacturePartWorking;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -38,8 +39,11 @@ final class TelegramCallbackMenu
         return self::CALLBACK;
     }
 
+    /**
+     * Роль доступа к меню
+     */
     public function getRole(): string
     {
-        return 'ROLE_MANUFACTURE_PART';
+        return VoterTelegram::getVoter();
     }
 }

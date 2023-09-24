@@ -26,6 +26,8 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\Working;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
+use BaksDev\Auth\Telegram\Repository\UserProfileByChat\UserProfileByChatInterface;
+use BaksDev\Core\Cache\AppCacheInterface;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
@@ -37,28 +39,25 @@ use BaksDev\Telegram\Api\TelegramSendMessage;
 use BaksDev\Telegram\Bot\Messenger\Callback\TelegramCallbackMessage;
 use BaksDev\Telegram\Bot\Repository\UsersTableTelegramSettings\GetTelegramBotSettingsInterface;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
-use Symfony\Component\Cache\Adapter\ApcuAdapter;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 #[AsMessageHandler(fromTransport: 'sync')]
 final class TelegramManufacturePartWorking
 {
+    private iterable $reference;
+
     private TelegramSendMessage $telegramSendMessage;
     private GetTelegramBotSettingsInterface $settings;
     private EntityManagerInterface $entityManager;
     private ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram;
     private AllWorkingByManufacturePartInterface $allWorkingByManufacturePart;
     private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart;
-
-    private LoggerInterface $logger;
-    private UrlGeneratorInterface $urlGenerator;
     private ProductsByManufacturePartInterface $productsByManufacturePart;
-    private iterable $reference;
     private TranslatorInterface $translator;
+    private UserProfileByChatInterface $profileByChat;
+    private AppCacheInterface $cache;
 
     public function __construct(
         #[TaggedIterator('baks.reference.choice')] iterable $reference,
@@ -68,10 +67,10 @@ final class TelegramManufacturePartWorking
         TelegramSendMessage $telegramSendMessage,
         GetTelegramBotSettingsInterface $settings,
         AllWorkingByManufacturePartInterface $allWorkingByManufacturePart,
-        LoggerInterface $logger,
-        UrlGeneratorInterface $urlGenerator,
         ProductsByManufacturePartInterface $productsByManufacturePart,
-        TranslatorInterface $translator
+        TranslatorInterface $translator,
+        UserProfileByChatInterface $profileByChat,
+        AppCacheInterface $cache
     )
     {
         $this->telegramSendMessage = $telegramSendMessage;
@@ -81,11 +80,12 @@ final class TelegramManufacturePartWorking
         $this->activeWorkingManufacturePart = $activeWorkingManufacturePart;
         $this->allWorkingByManufacturePart = $allWorkingByManufacturePart;
 
-        $this->logger = $logger;
-        $this->urlGenerator = $urlGenerator;
+
         $this->productsByManufacturePart = $productsByManufacturePart;
         $this->reference = $reference;
         $this->translator = $translator;
+        $this->profileByChat = $profileByChat;
+        $this->cache = $cache;
     }
 
     /**
@@ -98,7 +98,32 @@ final class TelegramManufacturePartWorking
             return;
         }
 
-        $ApcuAdapter = new ApcuAdapter('TelegramBot');
+        $RedisCache = $this->cache->init('TelegramBot');
+
+
+        /** Получаем активный профиль пользователя чата */
+        $UserProfileUid = $this->activeProfileByAccountTelegram
+            ->getActiveProfileUidOrNullResultByChat($message->getChat());
+
+        if($UserProfileUid === null)
+        {
+            /** Сбрасываем идентификатор и callback */
+            $RedisCache->delete('identifier-'.$message->getChat());
+            $RedisCache->delete('callback-'.$message->getChat());
+
+            return;
+        }
+
+        /**
+         * Присваиваем настройки Telegram
+         */
+
+        $settings = $this->settings->settings();
+
+        $this->telegramSendMessage
+            ->token($settings->getToken())
+            ->chanel($message->getChat());
+
 
         /**
          * Получаем заявку на производство
@@ -107,206 +132,230 @@ final class TelegramManufacturePartWorking
             ->getRepository(ManufacturePart::class)
             ->find($message->getClass());
 
-        if($ManufacturePart)
+
+        if(!$ManufacturePart)
         {
+            /** Отправляем сообщение о выполненной заявке  */
+            $caption = '<b>Производство:</b>';
+            $caption .= "\n";
+            $caption .= 'Вышлите QR продукта, либо его идентификатор';
 
-            /** Получаем активный профиль пользователя чата */
-            $UserProfileUid = $this->activeProfileByAccountTelegram
-                ->getActiveProfileUidOrNullResultByChat($message->getChat());
+            $response = $this->telegramSendMessage
+                ->message($caption)
+                ->send(false);
 
-            if($UserProfileUid === null)
+            /** Сохраняем последнее сообщение */
+            $lastMessage = $RedisCache->getItem('last-'.$message->getChat());
+            $lastMessage->set($response['result']['message_id']);
+            $lastMessage->expiresAfter(86400);
+            $RedisCache->save($lastMessage);
+
+
+            /** Сбрасываем фиксацию производственной партии и идентификатор */
+            $RedisCache->delete('identifier-'.$message->getChat());
+            $RedisCache->delete('fixed-'.$ManufacturePart->getId());
+
+            return;
+        }
+
+
+        /** Получаем активное рабочее состояние производственной партии */
+        $UsersTableActionsWorkingUid = $this->activeWorkingManufacturePart
+            ->findNextWorkingByManufacturePart($ManufacturePart->getId());
+
+
+        if(!$UsersTableActionsWorkingUid)
+        {
+            /** Сбрасываем идентификатор и фиксацию */
+            $RedisCache->delete('identifier-'.$message->getChat());
+            $RedisCache->delete('fixed-'.$ManufacturePart->getId());
+
+            /** Получаем информацию о выполненных этапах */
+            $CompleteWorking = $this->activeWorkingManufacturePart
+                ->fetchCompleteWorkingByManufacturePartAssociative($ManufacturePart->getId());
+
+            $caption = "Заявка выполнена";
+            $caption .= "\n";
+            $caption .= "\n";
+
+            if($CompleteWorking)
             {
-                /** Сбрасываем идентификатор и callback */
-                $ApcuAdapter->delete('identifier-'.$message->getChat());
-                $ApcuAdapter->delete('callback-'.$message->getChat());
 
-                return;
-            }
+                $currentComplete = current($CompleteWorking);
 
-            /** Присваиваем настройки Telegram */
-
-            $settings = $this->settings->settings();
-
-            $this->telegramSendMessage
-                ->token($settings->getToken())
-                ->chanel($message->getChat());
-
-
-            /** Получаем активное рабочее состояние производственной партии */
-            $UsersTableActionsWorkingUid = $this->activeWorkingManufacturePart
-                ->findNextWorkingByManufacturePart($ManufacturePart->getId());
-
-
-            if(!$UsersTableActionsWorkingUid)
-            {
-                /** Сбрасываем идентификатор */
-                $ApcuAdapter->delete('identifier-'.$message->getChat());
-
-                /** Получаем информацию о выполненных этапах */
-                $CompleteWorking = $this->activeWorkingManufacturePart
-                    ->fetchCompleteWorkingByManufacturePartAssociative($ManufacturePart->getId());
-
-                $caption = "Заявка выполнена";
+                $caption .= 'Номер: <b>'.$currentComplete['part_number'].'</b>';
+                $caption .= "\n";
+                $caption .= 'Всего продукции: <b>'.$currentComplete['part_quantity'].' шт.</b>';
                 $caption .= "\n";
                 $caption .= "\n";
 
-                if($CompleteWorking)
+
+                /** Получаем продукцию в производственной партии и присваиваем к сообщению */
+                $caption = $this->captionProducts($ManufacturePart->getId(), $caption);
+
+                $caption .= '<b>Этапы производства:</b>';
+                $caption .= "\n";
+                foreach($CompleteWorking as $complete)
                 {
-
-                    $currentComplete = current($CompleteWorking);
-
-                    $caption .= 'Номер: <b>'.$currentComplete['part_number'].'</b>';
+                    $caption .= $complete['working_name'].': <b>'.$complete['users_profile_username'].'</b>';
                     $caption .= "\n";
-                    $caption .= 'Всего продукции: <b>'.$currentComplete['part_quantity'].' шт.</b>';
-                    $caption .= "\n";
-                    $caption .= "\n";
-
-
-                    /** Получаем продукцию в производственной партии и присваиваем к сообщению */
-                    $caption = $this->captionProducts($ManufacturePart->getId(), $caption);
-
-                    $caption .= '<b>Этапы производства:</b>';
-                    $caption .= "\n";
-                    foreach($CompleteWorking as $complete)
-                    {
-                        $caption .= $complete['working_name'].': <b>'.$complete['users_profile_username'].'</b>';
-                        $caption .= "\n";
-                    }
                 }
-
-
-                /** Отправляем сообщение о выполненной заявке  */
-                $this->telegramSendMessage
-                    ->message($caption)
-                    ->send();
-
-
-                return;
-            }
-
-            /** Получаем этапы производства указанной производственной партии  */
-            $ManufacturePartWorking = $this->allWorkingByManufacturePart
-                ->fetchAllWorkingByManufacturePartAssociative($ManufacturePart->getId());
-
-
-            $caption = '<b>Произвосдтвенная партия:</b>';
-            $caption .= "\n";
-            $caption .= "\n";
-
-
-            $caption .= 'Номер: <b>'.$ManufacturePart->getNumber().'</b>';
-            $caption .= "\n";
-            $caption .= 'Всего продукции: <b>'.$ManufacturePart->getQuantity().' шт.</b>';
-            $caption .= "\n";
-            $caption .= "\n";
-
-
-            /** Получаем продукцию в производственной партии и присваиваем к сообщению */
-            $caption = $this->captionProducts($ManufacturePart->getId(), $caption);
-
-
-            /** Символ выполненного процесса  */
-            $char = "\u2611\ufe0f";
-            $decoded = json_decode('["'.$char.'"]');
-            $done = mb_convert_encoding($decoded[0], 'UTF-8');
-
-            /** Символ активного процесса  */
-            $char = "\u25b6\ufe0f";
-            $decoded = json_decode('["'.$char.'"]');
-            $right = mb_convert_encoding($decoded[0], 'UTF-8');
-
-            /** Символ НЕ выполненного процесса  */
-            $char = "\u2705";
-            $decoded = json_decode('["'.$char.'"]');
-            $muted = mb_convert_encoding($decoded[0], 'UTF-8');
-
-
-            $currentWorkingName = null;
-
-
-            $caption .= '<b>Этапы производства:</b>';
-            $caption .= "\n";
-
-            /**
-             * Все действия сотрудников, которые он может выполнить
-             */
-            foreach($ManufacturePartWorking as $working)
-            {
-                $icon = $currentWorkingName ? $done : $muted;
-
-                if($UsersTableActionsWorkingUid->equals($working['working_id']))
-                {
-                    $currentWorkingName = $working['working_name'];
-                    $icon = $right;
-                }
-
-                $caption .= $icon;
-                $caption .= ' '.$working['working_name'];
-
-                if($UsersTableActionsWorkingUid->equals($working['working_id']))
-                {
-                    $caption .= ' <b>'.$ManufacturePart->getQuantity().' шт </b>';
-                }
-
-                $caption .= "\n";
             }
 
 
-            $CurrentManufacturePart = current($ManufacturePartWorking);
-
-            /* Комментарий к заявке */
-            if($CurrentManufacturePart['part_comment'])
-            {
-                $caption .= "\n";
-                $caption .= $CurrentManufacturePart['part_comment'];
-                $caption .= "\n";
-
-            }
-
-            $caption .= "\n";
-            $caption .= 'Если Вами был найден брак - обратитесь к ответственному за данную производственную партию.';
-
-
-            $menu[] = [
-                'text' => sprintf('Выполнено "%s" все %s шт.',
-                    $currentWorkingName,
-                    $ManufacturePart->getQuantity()
-                ),
-
-                'callback_data' => ManufacturePartDone::class
-            ];
-
-            $markup = json_encode([
-                'inline_keyboard' => array_chunk($menu, 1),
-            ]);
-
+            /** Отправляем сообщение о выполненной заявке  */
             $this->telegramSendMessage
                 ->message($caption)
-                ->markup($markup)
                 ->send();
 
             return;
         }
 
 
-        /** Отправляем сообщение о выполненной заявке  */
-        $caption = '<b>Производство:</b>';
+        /**
+         * Проверяем, что партия не фиксированна за другом сотрудником
+         */
+        $fixedManufacturePart = $RedisCache->getItem('fixed-'.$ManufacturePart->getId())->get();
+
+        if($fixedManufacturePart !== null && $fixedManufacturePart !== $message->getChat())
+        {
+
+            /** Получаем профиль пользователя зафиксировавшего партию */
+            $profileName = $this->profileByChat->getUserProfileNameByChat($fixedManufacturePart);
+
+            /** Отправляем сообщение фиксации производственной партии  */
+            $caption = '<b>Производство:</b>';
+            $caption .= "\n";
+            $caption .= sprintf('Производственная партия %s выполняется пользователем %s!',
+                $ManufacturePart->getNumber(), $profileName
+            );
+
+            $response = $this->telegramSendMessage
+                ->message($caption)
+                ->send(false);
+
+            /** Сохраняем последнее сообщение */
+            $lastMessage = $RedisCache->getItem('last-'.$message->getChat());
+            $lastMessage->set($response['result']['message_id']);
+            $lastMessage->expiresAfter(86400);
+            $RedisCache->save($lastMessage);
+
+            /** Сбрасываем идентификатор */
+            $RedisCache->delete('identifier-'.$message->getChat());
+
+            return;
+        }
+
+
+        /** Получаем этапы производства указанной производственной партии  */
+        $ManufacturePartWorking = $this->allWorkingByManufacturePart
+            ->fetchAllWorkingByManufacturePartAssociative($ManufacturePart->getId());
+
+
+        $caption = '<b>Произвосдтвенная партия:</b>';
         $caption .= "\n";
-        $caption = 'Вышлите QR продукта, либо его идентификатор';
+        $caption .= "\n";
 
-        $response = $this->telegramSendMessage
+
+        $caption .= 'Номер: <b>'.$ManufacturePart->getNumber().'</b>';
+        $caption .= "\n";
+        $caption .= 'Всего продукции: <b>'.$ManufacturePart->getQuantity().' шт.</b>';
+        $caption .= "\n";
+        $caption .= "\n";
+
+
+        /** Получаем продукцию в производственной партии и присваиваем к сообщению */
+        $caption = $this->captionProducts($ManufacturePart->getId(), $caption);
+
+
+        /** Символ выполненного процесса  */
+        $char = "\u2611\ufe0f";
+        $decoded = json_decode('["'.$char.'"]');
+        $done = mb_convert_encoding($decoded[0], 'UTF-8');
+
+        /** Символ активного процесса  */
+        $char = "\u25b6\ufe0f";
+        $decoded = json_decode('["'.$char.'"]');
+        $right = mb_convert_encoding($decoded[0], 'UTF-8');
+
+        /** Символ НЕ выполненного процесса  */
+        $char = "\u2705";
+        $decoded = json_decode('["'.$char.'"]');
+        $muted = mb_convert_encoding($decoded[0], 'UTF-8');
+
+
+        $currentWorkingName = null;
+
+
+        $caption .= '<b>Этапы производства:</b>';
+        $caption .= "\n";
+
+        /**
+         * Все действия сотрудников, которые он может выполнить
+         */
+        foreach($ManufacturePartWorking as $working)
+        {
+            $icon = $currentWorkingName ? $done : $muted;
+
+            if($UsersTableActionsWorkingUid->equals($working['working_id']))
+            {
+                $currentWorkingName = $working['working_name'];
+                $icon = $right;
+            }
+
+            $caption .= $icon;
+            $caption .= ' '.$working['working_name'];
+
+            if($UsersTableActionsWorkingUid->equals($working['working_id']))
+            {
+                $caption .= ' <b>'.$ManufacturePart->getQuantity().' шт </b>';
+            }
+
+            $caption .= "\n";
+        }
+
+
+        $CurrentManufacturePart = current($ManufacturePartWorking);
+
+        /* Комментарий к заявке */
+        if($CurrentManufacturePart['part_comment'])
+        {
+            $caption .= "\n";
+            $caption .= $CurrentManufacturePart['part_comment'];
+            $caption .= "\n";
+
+        }
+
+        $caption .= "\n";
+        $caption .= 'Если Вами был найден брак - обратитесь к ответственному за данную производственную партию.';
+
+
+        $menu[] = [
+            'text' => sprintf('Выполнено "%s" все %s шт.',
+                $currentWorkingName,
+                $ManufacturePart->getQuantity()
+            ),
+
+            'callback_data' => ManufacturePartDone::class
+        ];
+
+        $markup = json_encode([
+            'inline_keyboard' => array_chunk($menu, 1),
+        ]);
+
+        $this->telegramSendMessage
             ->message($caption)
-            ->send(false);
+            ->markup($markup)
+            ->send();
 
-        /** Сохраняем последнее сообщение */
-        $lastMessage = $ApcuAdapter->getItem('last-'.$message->getChat());
-        $lastMessage->set($response['result']['message_id']);
-        $lastMessage->expiresAfter(86400);
-        $ApcuAdapter->save($lastMessage);
+        /**
+         * Фиксируем производственную партию за пользователем
+         */
+        $fixedManufacturePart = $RedisCache->getItem('fixed-'.$ManufacturePart->getId());
+        $fixedManufacturePart->set($message->getChat());
+        $fixedManufacturePart->expiresAfter(86400);
+        $RedisCache->save($fixedManufacturePart);
 
-        /** Сбрасываем идентификатор */
-
-        $ApcuAdapter->delete('identifier-'.$message->getChat());
 
     }
 
@@ -321,9 +370,7 @@ final class TelegramManufacturePartWorking
         {
             $caption .= ($key + 1).'. '.$product['product_article'].' ';
 
-            $caption .= '<b>'.$product['product_total'].' шт. | </b>';
-
-            $caption .= $product['product_name'].' ';
+            //$caption .= $product['product_name'].' ';
 
 
             if($product['product_offer_reference'])
@@ -358,7 +405,6 @@ final class TelegramManufacturePartWorking
             }
 
 
-
             if($product['product_modification_reference'])
             {
                 foreach($this->reference as $reference)
@@ -374,10 +420,11 @@ final class TelegramManufacturePartWorking
                 $product['product_modification_value'] ? $caption .= $product['product_modification_value'].' ' : '';
             }
 
+            $caption .= ' | <b>'.$product['product_total'].' шт.</b>';
 
+            $caption .= "\n";
         }
 
-        $caption .= "\n";
         $caption .= "\n";
 
         return $caption;
