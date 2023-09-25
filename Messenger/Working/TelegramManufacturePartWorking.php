@@ -38,6 +38,7 @@ use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Telegram\Api\TelegramSendMessage;
 use BaksDev\Telegram\Bot\Messenger\Callback\TelegramCallbackMessage;
 use BaksDev\Telegram\Bot\Repository\UsersTableTelegramSettings\GetTelegramBotSettingsInterface;
+use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -98,7 +99,7 @@ final class TelegramManufacturePartWorking
             return;
         }
 
-        $RedisCache = $this->cache->init('TelegramBot');
+        $AppCache = $this->cache->init('TelegramBot');
 
 
         /** Получаем активный профиль пользователя чата */
@@ -108,8 +109,8 @@ final class TelegramManufacturePartWorking
         if($UserProfileUid === null)
         {
             /** Сбрасываем идентификатор и callback */
-            $RedisCache->delete('identifier-'.$message->getChat());
-            $RedisCache->delete('callback-'.$message->getChat());
+            $AppCache->delete('identifier-'.$message->getChat());
+            $AppCache->delete('callback-'.$message->getChat());
 
             return;
         }
@@ -145,15 +146,15 @@ final class TelegramManufacturePartWorking
                 ->send(false);
 
             /** Сохраняем последнее сообщение */
-            $lastMessage = $RedisCache->getItem('last-'.$message->getChat());
+            $lastMessage = $AppCache->getItem('last-'.$message->getChat());
             $lastMessage->set($response['result']['message_id']);
-            $lastMessage->expiresAfter(86400);
-            $RedisCache->save($lastMessage);
+            $lastMessage->expiresAfter(DateInterval::createFromDateString('1 day'));
+            $AppCache->save($lastMessage);
 
 
             /** Сбрасываем фиксацию производственной партии и идентификатор */
-            $RedisCache->delete('identifier-'.$message->getChat());
-            $RedisCache->delete('fixed-'.$ManufacturePart->getId());
+            $AppCache->delete('identifier-'.$message->getChat());
+            $AppCache->delete('fixed-'.$ManufacturePart->getId());
 
             return;
         }
@@ -167,8 +168,8 @@ final class TelegramManufacturePartWorking
         if(!$UsersTableActionsWorkingUid)
         {
             /** Сбрасываем идентификатор и фиксацию */
-            $RedisCache->delete('identifier-'.$message->getChat());
-            $RedisCache->delete('fixed-'.$ManufacturePart->getId());
+            $AppCache->delete('identifier-'.$message->getChat());
+            $AppCache->delete('fixed-'.$ManufacturePart->getId());
 
             /** Получаем информацию о выполненных этапах */
             $CompleteWorking = $this->activeWorkingManufacturePart
@@ -213,9 +214,10 @@ final class TelegramManufacturePartWorking
 
 
         /**
-         * Проверяем, что партия не фиксированна за другом сотрудником
+         * Проверяем, что партия не фиксированна за другим сотрудником
          */
-        $fixedManufacturePart = $RedisCache->getItem('fixed-'.$ManufacturePart->getId())->get();
+        $itemManufacturePart = $AppCache->getItem('fixed-'.$ManufacturePart->getId());
+        $fixedManufacturePart = $itemManufacturePart->get();
 
         if($fixedManufacturePart !== null && $fixedManufacturePart !== $message->getChat())
         {
@@ -235,13 +237,13 @@ final class TelegramManufacturePartWorking
                 ->send(false);
 
             /** Сохраняем последнее сообщение */
-            $lastMessage = $RedisCache->getItem('last-'.$message->getChat());
+            $lastMessage = $AppCache->getItem('last-'.$message->getChat());
             $lastMessage->set($response['result']['message_id']);
-            $lastMessage->expiresAfter(86400);
-            $RedisCache->save($lastMessage);
+            $lastMessage->expiresAfter(DateInterval::createFromDateString('1 day'));
+            $AppCache->save($lastMessage);
 
             /** Сбрасываем идентификатор */
-            $RedisCache->delete('identifier-'.$message->getChat());
+            $AppCache->delete('identifier-'.$message->getChat());
 
             return;
         }
@@ -252,7 +254,7 @@ final class TelegramManufacturePartWorking
             ->fetchAllWorkingByManufacturePartAssociative($ManufacturePart->getId());
 
 
-        $caption = '<b>Произвосдтвенная партия:</b>';
+        $caption = '<b>Производственная партия:</b>';
         $caption .= "\n";
         $caption .= "\n";
 
@@ -327,9 +329,13 @@ final class TelegramManufacturePartWorking
         }
 
         $caption .= "\n";
+        $caption .= 'Заявка зафиксированная за Вами! Для сброса фиксации перейдите в начало меню.';
+
+        $caption .= "\n";
+        $caption .= "\n";
         $caption .= 'Если Вами был найден брак - обратитесь к ответственному за данную производственную партию.';
 
-
+      
         $menu[] = [
             'text' => sprintf('Выполнено "%s" все %s шт.',
                 $currentWorkingName,
@@ -351,10 +357,10 @@ final class TelegramManufacturePartWorking
         /**
          * Фиксируем производственную партию за пользователем
          */
-        $fixedManufacturePart = $RedisCache->getItem('fixed-'.$ManufacturePart->getId());
+        $fixedManufacturePart = $AppCache->getItem('fixed-'.$ManufacturePart->getId());
         $fixedManufacturePart->set($message->getChat());
-        $fixedManufacturePart->expiresAfter(86400);
-        $RedisCache->save($fixedManufacturePart);
+        $fixedManufacturePart->expiresAfter(DateInterval::createFromDateString('1 day'));
+        $AppCache->save($fixedManufacturePart);
 
 
     }
