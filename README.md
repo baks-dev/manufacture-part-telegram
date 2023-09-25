@@ -2,6 +2,7 @@
 
 ![Version](https://img.shields.io/badge/version-6.3.4-blue) ![php 8.1+](https://img.shields.io/badge/php-min%208.1-red.svg)
 
+
 Модуль производства партий продукции с помощью Telegram-бота
 
 ## Установка
