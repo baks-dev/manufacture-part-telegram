@@ -43,7 +43,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use DomainException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-#[AsMessageHandler(fromTransport: 'sync', priority: 100)]
+#[AsMessageHandler]
 final class TelegramManufacturePartDone
 {
     private TelegramSendMessage $telegramSendMessage;

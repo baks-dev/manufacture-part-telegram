@@ -25,11 +25,20 @@ declare(strict_types=1);
 
 namespace BaksDev\Manufacture\Part\Telegram\Type;
 
+use App\Kernel;
 use BaksDev\Core\Type\UidType\Uid;
+use Symfony\Component\Uid\AbstractUid;
 
 
 final class ManufacturePartWorking extends Uid
 {
+    public const TEST = '018ad882-64d8-7d9c-a80e-e1f089318c9c';
+
     public const TYPE = 'manufacture_part_working';
+
+    public function __construct(AbstractUid|string|null $value = null)
+    {
+        parent::__construct(Kernel::isTestEnvironment() && !$value ? self::TEST : $value);
+    }
 
 }
