@@ -86,7 +86,7 @@ final class TelegramManufacturePartDone
             return;
         }
 
-        $AppCache = $this->cache->init('TelegramBot');
+        $AppCache = $this->cache->init('telegram-bot');
         $AppCache->delete('identifier-'.$message->getChat());
         $AppCache->delete('callback-'.$message->getChat());
 

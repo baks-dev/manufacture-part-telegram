@@ -1,7 +1,7 @@
 {
   "namespaces": [
     {
-      "namespace": "ManufacturePartTelegram",
+      "namespace": "manufacture-part-telegram",
       "path": "Resources/view"
     }
   ]

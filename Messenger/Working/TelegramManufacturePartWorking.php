@@ -99,7 +99,7 @@ final class TelegramManufacturePartWorking
             return;
         }
 
-        $AppCache = $this->cache->init('TelegramBot');
+        $AppCache = $this->cache->init('telegram-bot');
 
 
         /** Получаем активный профиль пользователя чата */
