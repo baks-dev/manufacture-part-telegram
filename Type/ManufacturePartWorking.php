@@ -36,9 +36,4 @@ final class ManufacturePartWorking extends Uid
 
     public const TYPE = 'manufacture_part_working';
 
-    public function __construct(AbstractUid|string|null $value = null)
-    {
-        parent::__construct(Kernel::isTestEnvironment() && !$value ? self::TEST : $value);
-    }
-
 }
