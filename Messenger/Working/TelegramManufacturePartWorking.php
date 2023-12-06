@@ -374,6 +374,15 @@ final class TelegramManufacturePartWorking
 
         foreach($products as $key => $product)
         {
+
+            if($key >= 50)
+            {
+                $caption .= "\n";
+                $caption .= '<b>Подробный список производственной партии более 50 позиций только в CRM!</b>';
+                $caption .= "\n";
+                break;
+            }
+
             $caption .= ($key + 1).'. '.$product['product_article'].' ';
 
             //$caption .= $product['product_name'].' ';
