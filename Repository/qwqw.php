@@ -1,6 +1,6 @@
 <?php
 /*
- *  Copyright 2023.  Baks.dev <admin@baks.dev>
+ *  Copyright 2024.  Baks.dev <admin@baks.dev>
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -23,27 +23,9 @@
 
 declare(strict_types=1);
 
-namespace BaksDev\Manufacture\Part\Telegram\Messenger\Working;
+namespace BaksDev\Manufacture\Part\Telegram\Repository;
 
-use BaksDev\Manufacture\Part\Telegram\Security\VoterTelegram;
-use BaksDev\Manufacture\Part\Telegram\Type\ManufacturePartWorking;
-use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-
-#[AutoconfigureTag('baks.telegram.callback')]
-final class TelegramCallbackMenu
+final class qwqw
 {
-    private const CALLBACK = ManufacturePartWorking::class;
 
-    public function getClass(): string
-    {
-        return self::CALLBACK;
-    }
-
-    /**
-     * Роль доступа к меню
-     */
-    public function getRole(): string
-    {
-        return VoterTelegram::getVoter();
-    }
 }

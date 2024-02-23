@@ -1,0 +1,14 @@
+[Unit]
+Description=Symfony messenger manufacture-part-telegram %i
+StartLimitBurst=5
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=php /.....path..../bin/console messenger:consume manufacture-part-telegram --memory-limit=128m --time-limit=3600 --limit=100
+Restart=always
+
+User=unit
+Group=unit
+
+[Install]
+WantedBy=default.target
