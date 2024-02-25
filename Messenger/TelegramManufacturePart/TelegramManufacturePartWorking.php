@@ -26,14 +26,17 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\TelegramManufacturePart;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
+use BaksDev\Manufacture\Part\Entity\Event\ManufacturePartEvent;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
+use BaksDev\Manufacture\Part\Repository\ManufacturePartCurrentEvent\ManufacturePartCurrentEventInterface;
 use BaksDev\Manufacture\Part\Repository\ProductsByManufacturePart\ProductsByManufacturePartInterface;
 use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Telegram\Api\TelegramSendMessage;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
+use BaksDev\Telegram\Bot\Repository\SecurityProfileIsGranted\TelegramSecurityInterface;
 use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -58,7 +61,8 @@ final class TelegramManufacturePartWorking
     private LoggerInterface $logger;
     private ManufacturePartFixedInterface $manufacturePartFixed;
 
-    private TelegramRequestIdentifier $requst;
+    private TelegramRequestIdentifier $request;
+
 
     public function __construct(
         #[TaggedIterator('baks.reference.choice')] iterable $reference,
@@ -71,7 +75,7 @@ final class TelegramManufacturePartWorking
         TranslatorInterface $translator,
         Security $security,
         LoggerInterface $manufacturePartTelegramLogger,
-        ManufacturePartFixedInterface $manufacturePartFixed
+        ManufacturePartFixedInterface $manufacturePartFixed,
     )
     {
         $this->telegramSendMessage = $telegramSendMessage;
@@ -107,7 +111,7 @@ final class TelegramManufacturePartWorking
             return;
         }
 
-        $this->requst = $TelegramRequest;
+        $this->request = $TelegramRequest;
 
         /**
          * Получаем заявку на производство
@@ -144,6 +148,13 @@ final class TelegramManufacturePartWorking
 
 
         $this->telegramSendMessage->chanel($TelegramRequest->getChatId());
+
+
+        /**
+         * TODO: Проверяем, что профиль пользователя чата соответствует правилам доступа
+         */
+
+
 
         /* Получаем активное рабочее состояние производственной партии которое необходимо выполнить */
         $UsersTableActionsWorkingUid = $this->activeWorkingManufacturePart
@@ -424,7 +435,7 @@ final class TelegramManufacturePartWorking
 
         /** Отправляем сообщение о выполненной заявке */
         $this->telegramSendMessage
-            ->delete($this->requst->getId())
+            ->delete($this->request->getId())
             ->message($caption)
             ->send();
     }

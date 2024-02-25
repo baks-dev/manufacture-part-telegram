@@ -26,14 +26,17 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\TelegramManufacturePart;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
+use BaksDev\Manufacture\Part\Entity\Event\ManufacturePartEvent;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
+use BaksDev\Manufacture\Part\Repository\ManufacturePartCurrentEvent\ManufacturePartCurrentEventInterface;
 use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Manufacture\Part\UseCase\Admin\Action\ManufacturePartActionDTO;
 use BaksDev\Manufacture\Part\UseCase\Admin\Action\ManufacturePartActionHandler;
 use BaksDev\Telegram\Api\TelegramSendMessage;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
+use BaksDev\Telegram\Bot\Repository\SecurityProfileIsGranted\TelegramSecurityInterface;
 use BaksDev\Telegram\Request\Type\TelegramRequestCallback;
 use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
 use DateTimeImmutable;
@@ -63,7 +66,7 @@ final class TelegramManufacturePartDone
         ManufacturePartActionHandler $ManufacturePartActionHandler,
         Security $security,
         LoggerInterface $manufacturePartTelegramLogger,
-        ManufacturePartFixedInterface $manufacturePartFixed
+        ManufacturePartFixedInterface $manufacturePartFixed,
     )
     {
         $this->telegramSendMessage = $telegramSendMessage;
@@ -74,6 +77,7 @@ final class TelegramManufacturePartDone
         $this->security = $security;
         $this->logger = $manufacturePartTelegramLogger;
         $this->manufacturePartFixed = $manufacturePartFixed;
+
     }
 
     /**
@@ -128,6 +132,12 @@ final class TelegramManufacturePartDone
 
 
         $this->telegramSendMessage->chanel($TelegramRequest->getChatId());
+
+
+
+        /**
+         * TODO: Проверяем, что профиль пользователя чата соответствует правилам доступа
+         */
 
 
         /** Снимаем фиксацию с производственной партии за сотрудником */

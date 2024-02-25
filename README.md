@@ -1,6 +1,6 @@
 # BaksDev Manufacture Part Telegram
 
-[![Version](https://img.shields.io/badge/version-7.0.8-blue)](https://github.com/baks-dev/manufacture-part-telegram/releases)
+[![Version](https://img.shields.io/badge/version-7.0.9-blue)](https://github.com/baks-dev/manufacture-part-telegram/releases)
 ![php 8.2+](https://img.shields.io/badge/php-min%208.1-red.svg)
 
 Модуль производства партий продукции с помощью Telegram-бота
