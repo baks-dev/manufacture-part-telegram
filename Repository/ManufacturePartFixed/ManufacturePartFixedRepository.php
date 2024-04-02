@@ -32,7 +32,7 @@ use BaksDev\Users\Profile\UserProfile\Entity\Personal\UserProfilePersonal;
 use BaksDev\Users\Profile\UserProfile\Entity\UserProfile;
 use BaksDev\Users\Profile\UserProfile\Type\Id\UserProfileUid;
 
-final class ManufacturePartFixed implements ManufacturePartFixedInterface
+final class ManufacturePartFixedRepository implements ManufacturePartFixedInterface
 {
     private DBALQueryBuilder $DBALQueryBuilder;
 
