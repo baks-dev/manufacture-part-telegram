@@ -31,8 +31,8 @@ return static function (FrameworkConfig $framework) {
 
     $messenger
         ->transport('manufacture-part-telegram')
-        ->dsn('%env(MESSENGER_TRANSPORT_DSN)%')
-        ->options(['queue_name' => 'manufacture-part-telegram'])
+        ->dsn('redis://%env(REDIS_PASSWORD)%@%env(REDIS_HOST)%:%env(REDIS_PORT)%?auto_setup=true')
+        ->options(['stream' => 'manufacture-part-telegram'])
         ->failureTransport('failed-manufacture-part-telegram')
         ->retryStrategy()
         ->maxRetries(3)
@@ -43,7 +43,9 @@ return static function (FrameworkConfig $framework) {
 
     ;
 
-    $messenger->transport('failed-manufacture-part-telegram')
+    $failure = $framework->messenger();
+
+    $failure->transport('failed-manufacture-part-telegram')
         ->dsn('%env(MESSENGER_TRANSPORT_DSN)%')
         ->options(['queue_name' => 'failed-manufacture-part-telegram'])
     ;
