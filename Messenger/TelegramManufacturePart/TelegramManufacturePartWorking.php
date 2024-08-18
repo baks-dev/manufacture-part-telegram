@@ -41,7 +41,7 @@ use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -65,7 +65,7 @@ final class TelegramManufacturePartWorking
 
 
     public function __construct(
-        #[TaggedIterator('baks.reference.choice')] iterable $reference,
+        #[AutowireIterator('baks.reference.choice')] iterable $reference,
         EntityManagerInterface $entityManager,
         ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
         ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
