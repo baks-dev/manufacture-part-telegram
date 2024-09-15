@@ -34,7 +34,7 @@ use BaksDev\Manufacture\Part\Repository\ManufacturePartCurrentEvent\ManufactureP
 use BaksDev\Manufacture\Part\Repository\ProductsByManufacturePart\ProductsByManufacturePartInterface;
 use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
-use BaksDev\Telegram\Api\TelegramSendMessage;
+use BaksDev\Telegram\Api\TelegramSendMessages;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
 use BaksDev\Telegram\Bot\Repository\SecurityProfileIsGranted\TelegramSecurityInterface;
 use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
@@ -50,7 +50,7 @@ final class TelegramManufacturePartWorking
 {
     private iterable $reference;
 
-    private TelegramSendMessage $telegramSendMessage;
+    private TelegramSendMessages $telegramSendMessage;
     private EntityManagerInterface $entityManager;
     private ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram;
     private AllWorkingByManufacturePartInterface $allWorkingByManufacturePart;
@@ -69,7 +69,7 @@ final class TelegramManufacturePartWorking
         EntityManagerInterface $entityManager,
         ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
         ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
-        TelegramSendMessage $telegramSendMessage,
+        TelegramSendMessages $telegramSendMessage,
         AllWorkingByManufacturePartInterface $allWorkingByManufacturePart,
         ProductsByManufacturePartInterface $productsByManufacturePart,
         TranslatorInterface $translator,

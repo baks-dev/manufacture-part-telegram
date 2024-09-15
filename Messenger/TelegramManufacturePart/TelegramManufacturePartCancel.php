@@ -32,7 +32,7 @@ use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorki
 use BaksDev\Manufacture\Part\Repository\ManufacturePartCurrentEvent\ManufacturePartCurrentEventInterface;
 use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
-use BaksDev\Telegram\Api\TelegramSendMessage;
+use BaksDev\Telegram\Api\TelegramSendMessages;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
 use BaksDev\Telegram\Bot\Repository\SecurityProfileIsGranted\TelegramSecurityInterface;
 use BaksDev\Telegram\Request\Type\TelegramRequestCallback;
@@ -46,7 +46,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 #[AsMessageHandler]
 final class TelegramManufacturePartCancel
 {
-    private TelegramSendMessage $telegramSendMessage;
+    private TelegramSendMessages $telegramSendMessage;
     private EntityManagerInterface $entityManager;
     private ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram;
     private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart;
@@ -58,7 +58,7 @@ final class TelegramManufacturePartCancel
         EntityManagerInterface $entityManager,
         ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
         ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
-        TelegramSendMessage $telegramSendMessage,
+        TelegramSendMessages $telegramSendMessage,
         Security $security,
         LoggerInterface $manufacturePartTelegramLogger,
         ManufacturePartFixedInterface $manufacturePartFixed,

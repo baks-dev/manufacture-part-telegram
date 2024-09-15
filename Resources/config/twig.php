@@ -24,23 +24,13 @@
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use BaksDev\Manufacture\Part\Telegram\BaksDevManufacturePartTelegramBundle;
+use Symfony\Config\TwigConfig;
 
-return static function (ContainerConfigurator $configurator) {
+return static function (TwigConfig $twig) {
 
-    $services = $configurator->services()
-        ->defaults()
-        ->autowire()
-        ->autoconfigure()
-    ;
+    $twig->path(
+        BaksDevManufacturePartTelegramBundle::PATH.implode(DIRECTORY_SEPARATOR, ['Resources', 'view', '']), // .'Resources/view',
+        'manufacture-part-telegram'
+    );
 
-    $NAMESPACE = BaksDevManufacturePartTelegramBundle::NAMESPACE;
-    $PATH = BaksDevManufacturePartTelegramBundle::PATH;
-
-    $services->load($NAMESPACE, $PATH)
-        ->exclude([
-            $PATH.'{Entity,Resources,Type}',
-            $PATH.'**/*Message.php',
-            $PATH.'**/*DTO.php',
-        ])
-    ;
 };

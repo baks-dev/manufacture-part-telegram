@@ -1,6 +1,6 @@
 <?php
 /*
- *  Copyright 2023.  Baks.dev <admin@baks.dev>
+ *  Copyright 2024.  Baks.dev <admin@baks.dev>
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -23,31 +23,13 @@
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
+use BaksDev\Manufacture\Part\Telegram\BaksDevManufacturePartTelegramBundle;
 use Symfony\Config\FrameworkConfig;
 
-return static function (FrameworkConfig $framework) {
-    
-    $messenger = $framework->messenger();
+return static function (FrameworkConfig $config) {
 
-    $messenger
-        ->transport('manufacture-part-telegram')
-        ->dsn('redis://%env(REDIS_PASSWORD)%@%env(REDIS_HOST)%:%env(REDIS_PORT)%?auto_setup=true')
-        ->options(['stream' => 'manufacture-part-telegram'])
-        ->failureTransport('failed-manufacture-part-telegram')
-        ->retryStrategy()
-        ->maxRetries(3)
-        ->delay(1000)
-        ->maxDelay(0)
-        ->multiplier(3) // увеличиваем задержку перед каждой повторной попыткой
-        ->service(null)
+    $config
+        ->translator()
+        ->paths([BaksDevManufacturePartTelegramBundle::PATH.implode(DIRECTORY_SEPARATOR, ['Resources', 'translations', ''])]); // .'Resources/translations/']);
 
-    ;
-
-    $failure = $framework->messenger();
-
-    $failure->transport('failed-manufacture-part-telegram')
-        ->dsn('%env(MESSENGER_TRANSPORT_DSN)%')
-        ->options(['queue_name' => 'failed-manufacture-part-telegram'])
-    ;
 };
-
