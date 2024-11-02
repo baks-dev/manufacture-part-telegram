@@ -10,7 +10,7 @@
 # systemctl stop baks-manufacture-part-telegram@1.service
 
 [Unit]
-Description=Symfony messenger manufacture-part-telegram %i
+Description=manufacture-part-telegram
 StartLimitBurst=5
 StartLimitIntervalSec=0
 
