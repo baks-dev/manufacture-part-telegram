@@ -34,6 +34,6 @@ final class ManufacturePartWorking extends Uid
 {
     public const TEST = '018ad882-64d8-7d9c-a80e-e1f089318c9c';
 
-    public const TYPE = 'manufacture_part_working';
+    public const string TYPE = 'manufacture_part_working';
 
 }

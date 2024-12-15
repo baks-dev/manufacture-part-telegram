@@ -33,6 +33,6 @@ final class ManufacturePartDone extends Uid
 {
     public const TEST = '018ad876-4b37-7675-bfd2-00aa4e71cf6c';
 
-    public const TYPE = 'manufacture_part_done';
+    public const string TYPE = 'manufacture_part_done';
 
 }
