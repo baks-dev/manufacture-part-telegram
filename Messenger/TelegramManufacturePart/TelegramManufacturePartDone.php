@@ -1,6 +1,6 @@
 <?php
 /*
- *  Copyright 2024.  Baks.dev <admin@baks.dev>
+ *  Copyright 2025.  Baks.dev <admin@baks.dev>
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -26,17 +26,14 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\TelegramManufacturePart;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
-use BaksDev\Manufacture\Part\Entity\Event\ManufacturePartEvent;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
-use BaksDev\Manufacture\Part\Repository\ManufacturePartCurrentEvent\ManufacturePartCurrentEventInterface;
 use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Manufacture\Part\UseCase\Admin\Action\ManufacturePartActionDTO;
 use BaksDev\Manufacture\Part\UseCase\Admin\Action\ManufacturePartActionHandler;
 use BaksDev\Telegram\Api\TelegramSendMessages;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
-use BaksDev\Telegram\Bot\Repository\SecurityProfileIsGranted\TelegramSecurityInterface;
 use BaksDev\Telegram\Request\Type\TelegramRequestCallback;
 use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
 use DateTimeImmutable;
@@ -44,41 +41,22 @@ use Doctrine\ORM\EntityManagerInterface;
 use DomainException;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
-final class TelegramManufacturePartDone
+final readonly class TelegramManufacturePartDone
 {
-    private TelegramSendMessages $telegramSendMessage;
-    private EntityManagerInterface $entityManager;
-    private ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram;
-    private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart;
-    private ManufacturePartActionHandler $ManufacturePartActionHandler;
-    private Security $security;
-    private LoggerInterface $logger;
-    private ManufacturePartFixedInterface $manufacturePartFixed;
-
     public function __construct(
-        EntityManagerInterface $entityManager,
-        ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
-        ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
-        TelegramSendMessages $telegramSendMessage,
-        ManufacturePartActionHandler $ManufacturePartActionHandler,
-        Security $security,
-        LoggerInterface $manufacturePartTelegramLogger,
-        ManufacturePartFixedInterface $manufacturePartFixed,
-    )
-    {
-        $this->telegramSendMessage = $telegramSendMessage;
-        $this->entityManager = $entityManager;
-        $this->activeProfileByAccountTelegram = $activeProfileByAccountTelegram;
-        $this->activeWorkingManufacturePart = $activeWorkingManufacturePart;
-        $this->ManufacturePartActionHandler = $ManufacturePartActionHandler;
-        $this->security = $security;
-        $this->logger = $manufacturePartTelegramLogger;
-        $this->manufacturePartFixed = $manufacturePartFixed;
-
-    }
+        #[Target('manufacturePartTelegramLogger')] private LoggerInterface $logger,
+        private EntityManagerInterface $entityManager,
+        private ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
+        private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
+        private TelegramSendMessages $telegramSendMessage,
+        private ManufacturePartActionHandler $ManufacturePartActionHandler,
+        private Security $security,
+        private ManufacturePartFixedInterface $manufacturePartFixed,
+    ) {}
 
     /**
      * Выполняем действие сотрудника
@@ -134,7 +112,6 @@ final class TelegramManufacturePartDone
         $this->telegramSendMessage->chanel($TelegramRequest->getChatId());
 
 
-
         /**
          * TODO: Проверяем, что профиль пользователя чата соответствует правилам доступа
          */
@@ -170,7 +147,7 @@ final class TelegramManufacturePartDone
                 $caption = '<b>Производственная партия:</b>';
                 $caption .= "\n";
                 $caption .= "\n";
-                $caption .=  sprintf('Номер: <b>%s</b>', $ManufacturePart->getNumber());
+                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePart->getNumber());
                 $caption .= "\n";
                 $caption .= sprintf('Выполняется пользователем: <b>%s</b>', $fixedUserProfile['profile_username']);
 
