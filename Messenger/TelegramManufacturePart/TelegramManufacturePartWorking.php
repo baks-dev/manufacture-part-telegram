@@ -56,7 +56,7 @@ final class TelegramManufacturePartWorking
         private readonly ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
         private readonly TelegramSendMessages $telegramSendMessage,
         private readonly AllWorkingByManufacturePartInterface $allWorkingByManufacturePart,
-        private readonly ProductsByManufacturePartInterface $productsByManufacturePart,
+        private readonly ProductsByManufacturePartInterface $ProductsByManufacturePart,
         private readonly TranslatorInterface $translator,
         private readonly Security $security,
         private readonly ManufacturePartFixedInterface $manufacturePartFixed,
@@ -289,7 +289,9 @@ final class TelegramManufacturePartWorking
     {
         $caption .= '<b>Продукция:</b>';
         $caption .= "\n";
-        $products = $this->productsByManufacturePart->getAllProductsByManufacturePart($part);
+        $products = $this->ProductsByManufacturePart
+            ->forPart($part)
+            ->findAll();
 
         foreach($products as $key => $product)
         {
