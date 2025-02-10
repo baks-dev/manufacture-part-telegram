@@ -26,6 +26,7 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\TelegramManufacturePart;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
+use BaksDev\Manufacture\Part\Entity\Invariable\ManufacturePartInvariable;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
@@ -72,7 +73,7 @@ final class TelegramManufacturePartWorking
         $TelegramRequest = $message->getTelegramRequest();
 
         if(
-            !$TelegramRequest instanceof TelegramRequestIdentifier ||
+            false === ($TelegramRequest instanceof TelegramRequestIdentifier) ||
             !$this->security->isGranted('ROLE_USER')
         )
         {
@@ -93,10 +94,11 @@ final class TelegramManufacturePartWorking
             ->find($ManufacturePartUid);
 
 
-        if(!$ManufacturePart)
+        if(false === ($ManufacturePart instanceof ManufacturePart))
         {
             return;
         }
+
 
         /**
          * Проверяем, что профиль пользователя чата активный
@@ -114,8 +116,14 @@ final class TelegramManufacturePartWorking
             return;
         }
 
-
         $this->telegramSendMessage->chanel($TelegramRequest->getChatId());
+
+
+        /** @var ManufacturePartInvariable $ManufacturePartInvariable */
+        $ManufacturePartInvariable = $this->entityManager
+            ->getRepository(ManufacturePartInvariable::class)
+            ->find($ManufacturePartUid);
+
 
 
         /**
@@ -154,7 +162,7 @@ final class TelegramManufacturePartWorking
                 $caption = '<b>Производственная партия выполняется:</b>';
                 $caption .= "\n";
                 $caption .= "\n";
-                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePart->getNumber());
+                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePartInvariable->getNumber());
                 $caption .= "\n";
                 $caption .= sprintf('Пользователь: <b>%s</b>', $fixedUserProfile['profile_username']);
 
@@ -176,9 +184,9 @@ final class TelegramManufacturePartWorking
         $caption .= "\n";
         $caption .= "\n";
 
-        $caption .= 'Номер: <b>'.$ManufacturePart->getNumber().'</b>';
+        $caption .= 'Номер: <b>'.$ManufacturePartInvariable->getNumber().'</b>';
         $caption .= "\n";
-        $caption .= 'Всего продукции: <b>'.$ManufacturePart->getQuantity().' шт.</b>';
+        $caption .= 'Всего продукции: <b>'.$ManufacturePartInvariable->getQuantity().' шт.</b>';
         $caption .= "\n";
         $caption .= "\n";
 
@@ -224,7 +232,7 @@ final class TelegramManufacturePartWorking
 
             if($UsersTableActionsWorkingUid->equals($working['working_id']))
             {
-                $caption .= ' <b>'.$ManufacturePart->getQuantity().' шт </b>';
+                $caption .= ' <b>'.$ManufacturePartInvariable->getQuantity().' шт </b>';
             }
 
             $caption .= "\n";
@@ -258,7 +266,7 @@ final class TelegramManufacturePartWorking
         $menu[] = [
             'text' => sprintf('Выполнено "%s" все %s шт.',
                 $currentWorkingName,
-                $ManufacturePart->getQuantity()
+                $ManufacturePartInvariable->getQuantity()
             ),
             'callback_data' => 'manufacture-part-done|'.$ManufacturePartUid
         ];

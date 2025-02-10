@@ -1,17 +1,17 @@
 <?php
 /*
  *  Copyright 2025.  Baks.dev <admin@baks.dev>
- *
+ *  
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
  *  in the Software without restriction, including without limitation the rights
  *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  *  copies of the Software, and to permit persons to whom the Software is furnished
  *  to do so, subject to the following conditions:
- *
+ *  
  *  The above copyright notice and this permission notice shall be included in all
  *  copies or substantial portions of the Software.
- *
+ *  
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NON INFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,6 +26,7 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\TelegramManufacturePart;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
+use BaksDev\Manufacture\Part\Entity\Invariable\ManufacturePartInvariable;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
@@ -112,6 +113,11 @@ final readonly class TelegramManufacturePartCancel
          */
 
 
+        /** @var ManufacturePartInvariable $ManufacturePartInvariable */
+        $ManufacturePartInvariable = $this->entityManager
+            ->getRepository(ManufacturePartInvariable::class)
+            ->find($ManufacturePartUid);
+
         /** Снимаем фиксацию с производственной партии за сотрудником */
         $fixedManufacturePart = $this->manufacturePartFixed->cancel($ManufacturePart->getEvent(), $UserProfileUid);
 
@@ -142,7 +148,7 @@ final readonly class TelegramManufacturePartCancel
                 $caption = '<b>Производственная партия:</b>';
                 $caption .= "\n";
                 $caption .= "\n";
-                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePart->getNumber());
+                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePartInvariable->getNumber());
                 $caption .= "\n";
                 $caption .= sprintf('Выполняется пользователем: <b>%s</b>', $fixedUserProfile['profile_username']);
 
@@ -182,11 +188,12 @@ final readonly class TelegramManufacturePartCancel
          * Отправляем уведомление пользователю об отмене фиксации им этапе
          */
 
+
         $messageHandler = '<b>Отмена выполнения производственной партии:</b>';
         $messageHandler .= "\n";
         $messageHandler .= "\n";
-        $messageHandler .= sprintf("Номер: <b>%s</b>\n", $ManufacturePart->getNumber()); // номер партии
-        $messageHandler .= sprintf("Дата <b>%s</b>\n", (new DateTimeImmutable())->format('d.m.Y H:i')); // Дата выполненного этапа
+        $messageHandler .= sprintf("Номер: <b>%s</b>\n", $ManufacturePartInvariable->getNumber()); // номер партии
+        $messageHandler .= sprintf("Дата <b>%s</b>\n", new DateTimeImmutable()->format('d.m.Y H:i')); // Дата выполненного этапа
 
         /** Отправляем сообщение об успешном выполнении этапа */
         $this
