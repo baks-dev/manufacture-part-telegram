@@ -47,6 +47,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 #[AsMessageHandler]
 final class TelegramManufacturePartWorking
 {
+    public const string KEY = 'UfjQCCzp';
+
     private TelegramRequestIdentifier $request;
 
     public function __construct(
@@ -124,12 +126,9 @@ final class TelegramManufacturePartWorking
             ->getRepository(ManufacturePartInvariable::class)
             ->find($ManufacturePartUid);
 
-
-
         /**
          * TODO: Проверяем, что профиль пользователя чата соответствует правилам доступа
          */
-
 
         /* Получаем активное рабочее состояние производственной партии которое необходимо выполнить */
         $UsersTableActionsWorkingUid = $this->activeWorkingManufacturePart
@@ -141,40 +140,6 @@ final class TelegramManufacturePartWorking
             $this->partCompleted($ManufacturePart->getId());
             return;
         }
-
-        /** Фиксируем производственную партию за сотрудником */
-        $fixedManufacturePart = $this->manufacturePartFixed->fixed($ManufacturePart->getEvent(), $UserProfileUid);
-
-        if(!$fixedManufacturePart)
-        {
-            /* Получаем профиль пользователя зафиксировавшего партию */
-            $fixedUserProfile = $this->manufacturePartFixed->findUserProfile($ManufacturePart->getEvent());
-
-            if(!$fixedUserProfile || empty($fixedUserProfile['profile_username']))
-            {
-                return;
-            }
-
-            /** Если пользователь НЕ является фиксатором - отправляем сообщение о фиксации */
-            if(false === $UserProfileUid->equals($fixedUserProfile['profile_id']))
-            {
-                /** Отправляем сообщение фиксации производственной партии  */
-                $caption = '<b>Производственная партия выполняется:</b>';
-                $caption .= "\n";
-                $caption .= "\n";
-                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePartInvariable->getNumber());
-                $caption .= "\n";
-                $caption .= sprintf('Пользователь: <b>%s</b>', $fixedUserProfile['profile_username']);
-
-                $this->telegramSendMessage
-                    ->delete([$TelegramRequest->getId()])
-                    ->message($caption)
-                    ->send(false);
-
-                return;
-            }
-        }
-
 
         /** Получаем этапы производства указанной производственной партии  */
         $ManufacturePartWorking = $this->allWorkingByManufacturePart
@@ -258,38 +223,36 @@ final class TelegramManufacturePartWorking
         $caption .= 'Если Вами был найден брак - обратитесь к ответственному за данную производственную партию.';
 
 
-        $menu[] = [
-            'text' => 'Отмена',
-            'callback_data' => 'manufacture-part-cancel|'.$ManufacturePartUid
-        ];
+        /** @see TelegramManufacturePartCancel */
 
         $menu[] = [
-            'text' => sprintf('Выполнено "%s" все %s шт.',
+            'text' => '🛑 Отмена',
+            'callback_data' => sprintf('%s|%s', TelegramManufacturePartCancel::KEY, $ManufacturePartUid)
+        ];
+
+        /** @see TelegramManufacturePartDone */
+
+        $menu[] = [
+            'text' => sprintf('Выполнить "%s" все %s шт.',
                 $currentWorkingName,
                 $ManufacturePartInvariable->getQuantity()
             ),
-            'callback_data' => 'manufacture-part-done|'.$ManufacturePartUid
+            'callback_data' => sprintf('%s|%s', TelegramManufacturePartDone::KEY, $ManufacturePartUid)
         ];
+
+
+        /** Отправляем сообщение */
 
         $markup = json_encode([
             'inline_keyboard' => array_chunk($menu, 1),
-        ]);
+        ], JSON_THROW_ON_ERROR);
+
 
         $this->telegramSendMessage
             ->delete([$TelegramRequest->getId()])
             ->message($caption)
             ->markup($markup)
             ->send();
-
-        //        /**
-        //         * Фиксируем производственную партию за пользователем
-        //         */
-        //        $fixedManufacturePart = $AppCache->getItem('fixed-'.$ManufacturePart->getId());
-        //        $fixedManufacturePart->set($message->getChat());
-        //        $fixedManufacturePart->expiresAfter(DateInterval::createFromDateString('1 day'));
-        //        $AppCache->save($fixedManufacturePart);
-
-
     }
 
 

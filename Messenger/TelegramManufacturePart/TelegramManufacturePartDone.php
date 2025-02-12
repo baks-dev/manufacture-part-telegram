@@ -26,10 +26,12 @@ declare(strict_types=1);
 namespace BaksDev\Manufacture\Part\Telegram\Messenger\TelegramManufacturePart;
 
 use BaksDev\Auth\Telegram\Repository\ActiveProfileByAccountTelegram\ActiveProfileByAccountTelegramInterface;
+use BaksDev\Manufacture\Part\Entity\Event\ManufacturePartEvent;
 use BaksDev\Manufacture\Part\Entity\Invariable\ManufacturePartInvariable;
 use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
-use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
+use BaksDev\Manufacture\Part\Repository\ManufacturePartCurrentEvent\ManufacturePartCurrentEventInterface;
+use BaksDev\Manufacture\Part\Telegram\Repository\ExistManufacturePart\ExistManufacturePartInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Manufacture\Part\UseCase\Admin\Action\ManufacturePartActionDTO;
 use BaksDev\Manufacture\Part\UseCase\Admin\Action\ManufacturePartActionHandler;
@@ -37,9 +39,10 @@ use BaksDev\Telegram\Api\TelegramSendMessages;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
 use BaksDev\Telegram\Request\Type\TelegramRequestCallback;
 use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
+use BaksDev\Users\Profile\UserProfile\Type\Id\UserProfileUid;
+use BaksDev\Users\UsersTable\Type\Actions\Working\UsersTableActionsWorkingUid;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
-use DomainException;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Target;
@@ -48,15 +51,17 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 #[AsMessageHandler]
 final readonly class TelegramManufacturePartDone
 {
+    public const string KEY = 'PHDHkJV';
+
     public function __construct(
         #[Target('manufacturePartTelegramLogger')] private LoggerInterface $logger,
-        private EntityManagerInterface $entityManager,
         private ActiveProfileByAccountTelegramInterface $activeProfileByAccountTelegram,
         private ActiveWorkingManufacturePartInterface $activeWorkingManufacturePart,
         private TelegramSendMessages $telegramSendMessage,
         private ManufacturePartActionHandler $ManufacturePartActionHandler,
         private Security $security,
-        private ManufacturePartFixedInterface $manufacturePartFixed,
+        private ManufacturePartCurrentEventInterface $ManufacturePartCurrentEvent,
+        private ExistManufacturePartInterface $ExistManufacturePart
     ) {}
 
     /**
@@ -64,42 +69,40 @@ final readonly class TelegramManufacturePartDone
      */
     public function __invoke(TelegramEndpointMessage $message): void
     {
-        /** @var TelegramRequestIdentifier $TelegramRequest */
+        /** @var TelegramRequestCallback $TelegramRequest */
         $TelegramRequest = $message->getTelegramRequest();
 
         if(
-            !$TelegramRequest instanceof TelegramRequestCallback ||
-            $TelegramRequest->getCall() !== 'manufacture-part-done' ||
+            false === ($TelegramRequest instanceof TelegramRequestCallback) ||
+            empty($TelegramRequest->getIdentifier()) ||
+            $TelegramRequest->getCall() !== self::KEY ||
             !$this->security->isGranted('ROLE_USER')
         )
         {
             return;
         }
 
-
         /**
-         * Получаем заявку на производство по идентификатору партии
+         * Проверяем что имеется производственная партия
          */
-        $ManufacturePartUid = new ManufacturePartUid($TelegramRequest->getIdentifier());
 
-        /** @var ManufacturePart $ManufacturePart */
-        $ManufacturePart = $this->entityManager
-            ->getRepository(ManufacturePart::class)
-            ->find($ManufacturePartUid);
+        $isExist = $this->ExistManufacturePart
+            ->forPart($TelegramRequest->getIdentifier())
+            ->isExist();
 
-        if(!$ManufacturePart)
+        if(false === $isExist)
         {
             return;
         }
 
-
         /**
          * Проверяем, что профиль пользователя чата активный
          */
+
         $UserProfileUid = $this->activeProfileByAccountTelegram
             ->findByChat($TelegramRequest->getChatId());
 
-        if(!$UserProfileUid)
+        if(false === ($UserProfileUid instanceof UserProfileUid))
         {
             $this->logger->warning('Активный профиль пользователя не найден', [
                 __FILE__.''.__LINE__,
@@ -109,61 +112,21 @@ final readonly class TelegramManufacturePartDone
             return;
         }
 
-
-        $this->telegramSendMessage->chanel($TelegramRequest->getChatId());
-
-
         /**
          * TODO: Проверяем, что профиль пользователя чата соответствует правилам доступа
          */
 
+        /**
+         * Получаем активное событие производственной партии
+         */
 
-        /** Снимаем фиксацию с производственной партии за сотрудником */
-        $fixedManufacturePart = $this->manufacturePartFixed->cancel($ManufacturePart->getEvent(), $UserProfileUid);
+        $ManufacturePartEvent = $this->ManufacturePartCurrentEvent
+            ->fromPart($TelegramRequest->getIdentifier())
+            ->find();
 
-        /** @var ManufacturePartInvariable $ManufacturePartInvariable */
-        $ManufacturePartInvariable = $this->entityManager
-            ->getRepository(ManufacturePartInvariable::class)
-            ->find($ManufacturePartUid);
-
-        if(!$fixedManufacturePart)
+        if(false === ($ManufacturePartEvent instanceof ManufacturePartEvent))
         {
-            /* Получаем профиль пользователя зафиксировавшего партию */
-            $fixedUserProfile = $this->manufacturePartFixed->findUserProfile($ManufacturePart->getEvent());
-
-            if(!$fixedUserProfile || empty($fixedUserProfile['profile_username']))
-            {
-                /** Отправляем сообщение с требованием QR  */
-                $caption = '<b>Производственная партия:</b>';
-                $caption .= "\n";
-                $caption .= 'Вышлите QR-код, либо его идентификатор:';
-
-                $this->telegramSendMessage
-                    ->delete([$TelegramRequest->getId()])
-                    ->message($caption)
-                    ->send(false);
-
-                return;
-            }
-
-            /** Если пользователь НЕ является фиксатором - отправляем сообщение о фиксации */
-            if(false === $UserProfileUid->equals($fixedUserProfile['profile_id']))
-            {
-                /** Отправляем сообщение фиксации производственной партии  */
-                $caption = '<b>Производственная партия:</b>';
-                $caption .= "\n";
-                $caption .= "\n";
-                $caption .= sprintf('Номер: <b>%s</b>', $ManufacturePartInvariable->getNumber());
-                $caption .= "\n";
-                $caption .= sprintf('Выполняется пользователем: <b>%s</b>', $fixedUserProfile['profile_username']);
-
-                $this->telegramSendMessage
-                    ->delete([$TelegramRequest->getId()])
-                    ->message($caption)
-                    ->send(false);
-
-                return;
-            }
+            return;
         }
 
 
@@ -172,20 +135,11 @@ final readonly class TelegramManufacturePartDone
          */
 
         $UsersTableActionsWorkingUid = $this->activeWorkingManufacturePart
-            ->findNextWorkingByManufacturePart($ManufacturePart->getId());
+            ->findNextWorkingByManufacturePart($ManufacturePartEvent->getMain());
 
-        if(!$UsersTableActionsWorkingUid)
+
+        if(false === ($UsersTableActionsWorkingUid instanceof UsersTableActionsWorkingUid))
         {
-            /** Отправляем сообщение с требованием QR  */
-            $caption = '<b>Производственная партия:</b>';
-            $caption .= "\n";
-            $caption .= 'Вышлите QR-код, либо его идентификатор:';
-
-            $this->telegramSendMessage
-                ->delete([$TelegramRequest->getId()])
-                ->message($caption)
-                ->send(false);
-
             return;
         }
 
@@ -194,7 +148,8 @@ final readonly class TelegramManufacturePartDone
          * Делаем отметку о выполнении этапа производства
          */
 
-        $ManufacturePartActionDTO = new ManufacturePartActionDTO($ManufacturePart->getEvent());
+        $ManufacturePartActionDTO = new ManufacturePartActionDTO();
+        $ManufacturePartEvent->getDto($ManufacturePartActionDTO);
 
         $ManufacturePartActionDTO
             ->getWorking()
@@ -203,9 +158,10 @@ final readonly class TelegramManufacturePartDone
 
         $ManufacturePartHandler = $this->ManufacturePartActionHandler->handle($ManufacturePartActionDTO);
 
-        if(!$ManufacturePartHandler instanceof ManufacturePart)
+        if(false === ($ManufacturePartHandler instanceof ManufacturePart))
         {
-            throw new DomainException(sprintf('Ошибка %s при обновлении этапа производства', $ManufacturePartHandler));
+            $this->logger->critical(sprintf('Ошибка %s при обновлении этапа производства', $ManufacturePartHandler));
+            return;
         }
 
         /**
@@ -215,15 +171,16 @@ final readonly class TelegramManufacturePartDone
         $messageHandler = '<b>Выполненный этап производственной партии:</b>';
         $messageHandler .= PHP_EOL;
         $messageHandler .= PHP_EOL;
-        $messageHandler .= sprintf('Номер: <b>%s</b>', $ManufacturePartInvariable->getNumber()); // номер партии
+        $messageHandler .= sprintf('Номер: <b>%s</b>', $ManufacturePartEvent->getNumber()); // номер партии
         $messageHandler .= PHP_EOL;
         $messageHandler .= sprintf('Дата: <b>%s</b>', new DateTimeImmutable()->format('d.m.Y H:i')); // Дата выполненного этапа
         $messageHandler .= PHP_EOL;
-        $messageHandler .= sprintf("%s: <b>%s шт.</b>", $UsersTableActionsWorkingUid->getAttr(), $ManufacturePartInvariable->getQuantity()); // Этап производства
+        $messageHandler .= sprintf("%s: <b>%s шт.</b>", $UsersTableActionsWorkingUid->getAttr(), $ManufacturePartEvent->getQuantity()); // Этап производства
 
         /** Отправляем сообщение об успешном выполнении этапа */
         $this
             ->telegramSendMessage
+            ->chanel($TelegramRequest->getChatId())
             ->delete([$TelegramRequest->getId()])
             ->message($messageHandler)
             ->send();
