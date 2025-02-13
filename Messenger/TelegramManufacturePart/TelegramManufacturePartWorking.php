@@ -216,9 +216,6 @@ final class TelegramManufacturePartWorking
         }
 
         $caption .= "\n";
-        $caption .= 'Заявка зафиксированная за Вами! Для сброса фиксации перейдите в начало меню.';
-
-        $caption .= "\n";
         $caption .= "\n";
         $caption .= 'Если Вами был найден брак - обратитесь к ответственному за данную производственную партию.';
 
@@ -226,8 +223,8 @@ final class TelegramManufacturePartWorking
         /** @see TelegramManufacturePartCancel */
 
         $menu[] = [
-            'text' => '🛑 Отмена',
-            'callback_data' => sprintf('%s|%s', TelegramManufacturePartCancel::KEY, $ManufacturePartUid)
+            'text' => '❌ Удалить сообщение', // Удалить сообщение
+            'callback_data' => 'telegram-delete-message'
         ];
 
         /** @see TelegramManufacturePartDone */

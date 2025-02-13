@@ -65,7 +65,7 @@ final readonly class TelegramManufacturePartDone
     ) {}
 
     /**
-     * Выполняем действие сотрудника
+     * Выполняем действие сотрудника и отправляем в ответ сообщение
      */
     public function __invoke(TelegramEndpointMessage $message): void
     {
