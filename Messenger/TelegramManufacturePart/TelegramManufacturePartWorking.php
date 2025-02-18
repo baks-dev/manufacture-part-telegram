@@ -31,7 +31,6 @@ use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\ProductsByManufacturePart\ProductsByManufacturePartInterface;
-use BaksDev\Manufacture\Part\Telegram\Repository\ManufacturePartFixed\ManufacturePartFixedInterface;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Telegram\Api\TelegramSendMessages;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
@@ -62,7 +61,6 @@ final class TelegramManufacturePartWorking
         private readonly ProductsByManufacturePartInterface $ProductsByManufacturePart,
         private readonly TranslatorInterface $translator,
         private readonly Security $security,
-        private readonly ManufacturePartFixedInterface $manufacturePartFixed,
     ) {}
 
 
@@ -74,6 +72,8 @@ final class TelegramManufacturePartWorking
         /** @var TelegramRequestIdentifier $TelegramRequest */
         $TelegramRequest = $message->getTelegramRequest();
 
+        $this->logger->critical('TelegramManufacturePartWorking', [$TelegramRequest, $this->security->isGranted('ROLE_USER')]);
+
         if(
             false === ($TelegramRequest instanceof TelegramRequestIdentifier) ||
             !$this->security->isGranted('ROLE_USER')
@@ -81,6 +81,7 @@ final class TelegramManufacturePartWorking
         {
             return;
         }
+
 
         $this->request = $TelegramRequest;
 
@@ -125,6 +126,7 @@ final class TelegramManufacturePartWorking
         $ManufacturePartInvariable = $this->entityManager
             ->getRepository(ManufacturePartInvariable::class)
             ->find($ManufacturePartUid);
+
 
         /**
          * TODO: Проверяем, что профиль пользователя чата соответствует правилам доступа
