@@ -72,8 +72,6 @@ final class TelegramManufacturePartWorking
         /** @var TelegramRequestIdentifier $TelegramRequest */
         $TelegramRequest = $message->getTelegramRequest();
 
-        $this->logger->critical('TelegramManufacturePartWorking', [$TelegramRequest, $this->security->isGranted('ROLE_USER')]);
-
         if(
             false === ($TelegramRequest instanceof TelegramRequestIdentifier) ||
             !$this->security->isGranted('ROLE_USER')
@@ -81,7 +79,6 @@ final class TelegramManufacturePartWorking
         {
             return;
         }
-
 
         $this->request = $TelegramRequest;
 
