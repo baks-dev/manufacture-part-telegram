@@ -31,6 +31,7 @@ use BaksDev\Manufacture\Part\Entity\ManufacturePart;
 use BaksDev\Manufacture\Part\Repository\ActiveWorkingManufacturePart\ActiveWorkingManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\AllWorkingByManufacturePart\AllWorkingByManufacturePartInterface;
 use BaksDev\Manufacture\Part\Repository\ProductsByManufacturePart\ProductsByManufacturePartInterface;
+use BaksDev\Manufacture\Part\Repository\ProductsByManufacturePart\ProductsByManufacturePartResult;
 use BaksDev\Manufacture\Part\Type\Id\ManufacturePartUid;
 use BaksDev\Telegram\Api\TelegramSendMessages;
 use BaksDev\Telegram\Bot\Messenger\TelegramEndpointMessage\TelegramEndpointMessage;
@@ -256,13 +257,14 @@ final class TelegramManufacturePartWorking
     {
         $caption .= '<b>Продукция:</b>';
         $caption .= "\n";
+
         $products = $this->ProductsByManufacturePart
             ->forPart($part)
             ->findAll();
 
+        /** @var ProductsByManufacturePartResult $product */
         foreach($products as $key => $product)
         {
-
             if($key >= 50)
             {
                 $caption .= "\n";
@@ -271,58 +273,58 @@ final class TelegramManufacturePartWorking
                 break;
             }
 
-            $caption .= ($key + 1).'. '.$product['product_article'].' ';
+            $caption .= ($key + 1).'. '.$product->getArticle().' ';
 
             //$caption .= $product['product_name'].' ';
 
 
-            if($product['product_offer_reference'])
+            if($product->getProductOfferReference())
             {
                 foreach($this->reference as $reference)
                 {
-                    if($reference->type() === $product['product_offer_reference'])
+                    if($reference->type() === $product->getProductOfferReference())
                     {
-                        $caption .= $this->translator->trans($product['product_offer_value'], domain: $reference->domain()).' ';
+                        $caption .= $this->translator->trans($product->getProductOfferValue(), domain: $reference->domain()).' ';
                     }
                 }
             }
             else
             {
-                $product['product_offer_value'] ? $caption .= $product['product_offer_value'].' ' : '';
+                empty($product->getProductOfferValue()) ?: $caption .= $product->getProductOfferValue().' ';
             }
 
-            if($product['product_variation_reference'])
+            if($product->getProductVariationReference())
             {
                 foreach($this->reference as $reference)
                 {
-                    if($reference->type() === $product['product_variation_reference'])
+                    if($reference->type() === $product->getProductVariationReference())
                     {
-                        $caption .= $this->translator->trans($product['product_variation_value'], domain: $reference->domain()).' ';
+                        $caption .= $this->translator->trans($product->getProductVariationValue(), domain: $reference->domain()).' ';
                     }
                 }
             }
             else
             {
-                $product['product_variation_value'] ? $caption .= $product['product_variation_value'].' ' : '';
+                empty($product->getProductVariationValue()) ?: $caption .= $product->getProductVariationValue().' ';
             }
 
 
-            if($product['product_modification_reference'])
+            if($product->getProductModificationReference())
             {
                 foreach($this->reference as $reference)
                 {
-                    if($reference->type() === $product['product_modification_reference'])
+                    if($reference->type() === $product->getProductModificationReference())
                     {
-                        $caption .= $this->translator->trans($product['product_modification_value'], domain: $reference->domain()).' ';
+                        $caption .= $this->translator->trans($product->getProductModificationValue(), domain: $reference->domain()).' ';
                     }
                 }
             }
             else
             {
-                $product['product_modification_value'] ? $caption .= $product['product_modification_value'].' ' : '';
+                empty($product->getProductModificationValue()) ?: $caption .= $product->getProductModificationValue().' ';
             }
 
-            $caption .= ' | <b>'.$product['product_total'].' шт.</b>';
+            $caption .= ' | <b>'.$product->getTotal().' шт.</b>';
 
             $caption .= "\n";
         }
@@ -354,7 +356,6 @@ final class TelegramManufacturePartWorking
             $caption .= 'Всего продукции: <b>'.$currentComplete['part_quantity'].' шт.</b>';
             $caption .= "\n";
             $caption .= "\n";
-
 
             /** Получаем продукцию в производственной партии и присваиваем к сообщению */
             $caption = $this->captionProducts($ManufacturePartUid, $caption);
