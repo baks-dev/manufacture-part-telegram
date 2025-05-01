@@ -61,7 +61,7 @@ final readonly class TelegramManufacturePartDone
         private ManufacturePartActionHandler $ManufacturePartActionHandler,
         private Security $security,
         private ManufacturePartCurrentEventInterface $ManufacturePartCurrentEvent,
-        private ExistManufacturePartInterface $ExistManufacturePart
+        private ExistManufacturePartInterface $ExistManufacturePart,
     ) {}
 
     /**
@@ -129,6 +129,13 @@ final readonly class TelegramManufacturePartDone
             return;
         }
 
+        $ManufacturePartInvariable = $ManufacturePartEvent->getInvariable();
+
+        if(false === ($ManufacturePartInvariable instanceof ManufacturePartInvariable))
+        {
+            return;
+        }
+
 
         /**
          * Получаем активное рабочее состояние производственной партии
@@ -171,11 +178,11 @@ final readonly class TelegramManufacturePartDone
         $messageHandler = '<b>Выполненный этап производственной партии:</b>';
         $messageHandler .= PHP_EOL;
         $messageHandler .= PHP_EOL;
-        $messageHandler .= sprintf('Номер: <b>%s</b>', $ManufacturePartEvent->getNumber()); // номер партии
+        $messageHandler .= sprintf('Номер: <b>%s</b>', $ManufacturePartInvariable->getNumber()); // номер партии
         $messageHandler .= PHP_EOL;
         $messageHandler .= sprintf('Дата: <b>%s</b>', new DateTimeImmutable()->format('d.m.Y H:i')); // Дата выполненного этапа
         $messageHandler .= PHP_EOL;
-        $messageHandler .= sprintf("%s: <b>%s шт.</b>", $UsersTableActionsWorkingUid->getAttr(), $ManufacturePartEvent->getQuantity()); // Этап производства
+        $messageHandler .= sprintf("%s: <b>%s шт.</b>", $UsersTableActionsWorkingUid->getAttr(), $ManufacturePartInvariable->getQuantity()); // Этап производства
 
         /** Отправляем сообщение об успешном выполнении этапа */
         $this
