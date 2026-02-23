@@ -22,7 +22,8 @@
   ],
   "require": {
     "php": ">=8.4",
-    "baks-dev/core": "^7.4"
+    "baks-dev/core": "^7.4",
+    "baks-dev/telegram-bot": "^7.4"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest"
