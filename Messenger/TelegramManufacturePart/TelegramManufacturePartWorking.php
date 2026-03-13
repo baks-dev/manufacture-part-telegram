@@ -39,11 +39,13 @@ use BaksDev\Telegram\Request\Type\TelegramRequestIdentifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
+#[Autoconfigure(shared: false)]
 #[AsMessageHandler(priority: 0)]
 final class TelegramManufacturePartWorking
 {
